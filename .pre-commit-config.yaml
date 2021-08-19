@@ -7,3 +7,10 @@ repos:
       - id: check-yaml
       - id: end-of-file-fixer
       - id: trailing-whitespace
+
+  - repo: https://github.com/talos-systems/conform
+    rev: v0.1.0-alpha.20
+    hooks:
+      - id: conform
+        stages:
+          - commit-msg

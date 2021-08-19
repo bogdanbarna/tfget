@@ -4,6 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/bogdanbarna/tfget)](https://goreportcard.com/report/github.com/bogdanbarna/tfget)
 [![codecov](https://codecov.io/gh/bogdanbarna/tfget/branch/main/graph/badge.svg)](https://codecov.io/gh/bogdanbarna/tfget)
 <!-- [![Release](https://img.shields.io/github/release/bogdanbarna/tfget.svg)](https://github.com/bogdanbarna/tfget/releases/latest) -->
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
 [![License](https://img.shields.io/github/license/bogdanbarna/tfget)](/LICENSE)
 
 ## About
