@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"strings"
 	"sort"
+	"regexp"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/html"
@@ -126,14 +127,28 @@ func init() {
 	log.SetLevel(log.InfoLevel)
 }
 
+func ValidateVersion(version string) bool {
+	if version == "latest" {
+		return true
+	}
+	version_number_pattern := `[01]\.\d+?(\.\d)?`
+	matched, regexErr := regexp.Match(version_number_pattern, []byte(version))
+	if regexErr != nil {
+		log.Fatal(regexErr)
+	}
+	return matched
+}
+
 func main() {
 	releasesUrl := "https://releases.hashicorp.com/terraform/"
 	platform := runtime.GOOS + "_" + runtime.GOARCH
 	var version_number string
 
 	cliArgs := os.Args
-	if len(cliArgs) > 1 && cliArgs[1] != "latest" {
-		// TODO parse version
+	if len(cliArgs) > 1 {
+		if !ValidateVersion(cliArgs[1]) {
+			log.Fatal("Not a valid version")
+		}
 		version_number = cliArgs[1]
 	} else {
 		versions, err := ListRemoteVersions(releasesUrl)
