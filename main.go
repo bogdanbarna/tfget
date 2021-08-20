@@ -110,6 +110,30 @@ func ListRemoteVersions() []string {
 	}
 }
 
+func ListLocal(dirPath string) {
+	fp, err := os.Open(dirPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	/*
+		Readdir(n int) reads the contents of the directory associated with file and returns a slice of up to n FileInfo values,
+		as would be returned by Lstat, in directory order.
+		Subsequent calls on the same file will yield further FileInfos.
+		If n > 0, Readdir() returns at most n FileInfo structures.
+		In this case, if Readdir() returns an empty slice, it will return a non-nil error explaining why.
+		At the end of a directory, the error is io.EOF.
+		If n <= 0, Readdir() returns all the FileInfo from the directory in a single slice
+		(Explication shamelessly copied from https://golang.cafe/blog/how-to-list-files-in-a-directory-in-go.html)
+	*/
+	files, err := fp.Readdir(0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, v := range files {
+		log.Println(v.Name())
+	}
+}
+
 func DetermineVersion(cliArg string, versions []string) string {
 	var version_number string
 
@@ -182,12 +206,14 @@ func main() {
 	dirPath := mkdirLocalCache(tfgetHome)
 
 	switch option := os.Args[1]; option {
-	case "list":
-		log.Fatal("Implementing...")
+	case "list", "list-local":
+		ListLocal(dirPath)
 	case "list-remote":
-		log.WithFields(log.Fields{
-			"versions": ListRemoteVersions(),
-		}).Info("Listing all remote versions")
+		log.Info("Listing all remote versions")
+		versions := ListRemoteVersions()
+		for _, v := range versions {
+			log.Info(v)
+		}
 	case "download":
 		version_number := DetermineVersion(os.Args[2], ListRemoteVersions())
 		filePath := "terraform_" + version_number
