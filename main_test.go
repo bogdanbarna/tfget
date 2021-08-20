@@ -8,7 +8,7 @@ import "testing"
 
 func TestGetVersion(t *testing.T) {
 	cases := []struct {
-		in []string
+		in   []string
 		want string
 	}{
 		{[]string{"0.14.3"}, "0.14.3"},
@@ -23,7 +23,7 @@ func TestGetVersion(t *testing.T) {
 
 func TestValidateVersion(t *testing.T) {
 	cases := []struct {
-		in string
+		in   string
 		want bool
 	}{
 		{"latest", true},

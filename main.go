@@ -1,16 +1,16 @@
 package main
 
 import (
-	"runtime"
-	"os"
+	"bufio"
+	"context"
 	"io"
 	"net/http"
-	"context"
-	"time"
-	"bufio"
-	"strings"
-	"sort"
+	"os"
 	"regexp"
+	"runtime"
+	"sort"
+	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/html"
@@ -122,7 +122,7 @@ func GetVersion(versions []string) string {
 }
 
 // Local cache
-func mkdirLocalCache(dirPath string ) string {
+func mkdirLocalCache(dirPath string) string {
 	// Replace $HOME with actual user home
 	if strings.Contains(dirPath, "$HOME") {
 		dirname, homeErr := os.UserHomeDir()
@@ -137,7 +137,7 @@ func mkdirLocalCache(dirPath string ) string {
 		log.WithFields(log.Fields{
 			"dirPath": dirPath,
 		}).Info("Directory not found, creating")
-	  mkdirErr := os.Mkdir(dirPath, 0700)
+		mkdirErr := os.Mkdir(dirPath, 0700)
 		if mkdirErr != nil {
 			log.Fatal(mkdirErr)
 		}
@@ -199,7 +199,7 @@ func main() {
 			log.Fatal(downloadErr)
 		}
 		log.WithFields(log.Fields{
-			"fullPathZip": fullPathZip,
+			"fullPathZip":    fullPathZip,
 			"version_number": version_number,
 		}).Info("Downloaded Terraform version on disk")
 	} else {
