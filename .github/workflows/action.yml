@@ -34,6 +34,6 @@ jobs:
           # skip-build-cache: true
       - name: test
         run: |
-          go test -race -coverprofile=coverage.txt -covermode=atomic -vet=off
+          go test -race -coverprofile=coverage.txt -covermode=atomic -vet=off -v
       - name: upload test coverage to CodeCov
         run: bash <(curl -s https://codecov.io/bash)

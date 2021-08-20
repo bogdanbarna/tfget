@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -17,18 +16,26 @@ import (
 )
 
 const releasesUrl = "https://releases.hashicorp.com/terraform/"
+const tfgetHome = "$HOME/.tfget/versions"
 
 //func UnarchiveZipFile(filepath string) {
 //	log.Println("Unzipping", filepath)
 //}
 
-func DownloadFile(filepath string, url string) error {
+func DownloadTerraform(filepath string, version_number string) error {
+	platform := runtime.GOOS + "_" + runtime.GOARCH
+	terraformUrl := releasesUrl + version_number + "/terraform_" + version_number + "_" + platform + ".zip"
+
+	log.WithFields(log.Fields{
+		"filepath": filepath,
+	}).Info("Downloading Terraform version")
+
 	// Handle HTTP request
 	client := &http.Client{}
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", terraformUrl, nil)
 	if err != nil {
 		return err
 	}
@@ -49,6 +56,9 @@ func DownloadFile(filepath string, url string) error {
 
 	// Write local file body
 	_, err = io.Copy(out, resp.Body)
+	log.WithFields(log.Fields{
+		"filepath": filepath,
+	}).Info("Downloaded Terraform version on disk")
 	return err
 }
 
@@ -56,7 +66,7 @@ func ListRemoteVersions() []string {
 	// Handle HTTP request
 	client := &http.Client{}
 	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", releasesUrl, nil)
 	if err != nil {
@@ -79,9 +89,6 @@ func ListRemoteVersions() []string {
 		if tt == html.ErrorToken { // Reached EOF
 			// Sort from latest to oldest
 			sort.Sort(sort.Reverse(sort.StringSlice(versions)))
-			log.WithFields(log.Fields{
-				"versions": versions,
-			}).Info("Parsed remote versions")
 			return versions
 		} else if tt == html.StartTagToken {
 			t := z.Token()
@@ -103,21 +110,33 @@ func ListRemoteVersions() []string {
 	}
 }
 
-func GetVersion(versions []string) string {
+func DetermineVersion(cliArg string, versions []string) string {
 	var version_number string
 
-	// index, element
-	found_it := false
-	for _, a_version := range versions {
-		if strings.Contains(a_version, version_number) {
-			version_number = a_version
-			found_it = true
-			break
+	if cliArg != "" {
+		if cliArg == "latest" {
+			version_number = versions[0]
+		} else {
+			found_it := false
+			for _, a_version := range versions {
+				if strings.Contains(a_version, cliArg) {
+					version_number = a_version
+					found_it = true
+					break
+				}
+			}
+			if found_it {
+				version_number = cliArg
+			} else {
+				log.WithFields(log.Fields{
+					"version_number": version_number,
+				}).Fatal("Version not found ")
+			}
 		}
+	} else {
+		log.Fatal("No CLI arguments found")
 	}
-	if !found_it {
-		log.Fatal("Version not found ", version_number)
-	}
+
 	return version_number
 }
 
@@ -137,7 +156,7 @@ func mkdirLocalCache(dirPath string) string {
 		log.WithFields(log.Fields{
 			"dirPath": dirPath,
 		}).Info("Directory not found, creating")
-		mkdirErr := os.Mkdir(dirPath, 0700)
+		mkdirErr := os.MkdirAll(dirPath, 0700)
 		if mkdirErr != nil {
 			log.Fatal(mkdirErr)
 		}
@@ -147,7 +166,7 @@ func mkdirLocalCache(dirPath string) string {
 
 func init() {
 	// Log as JSON instead of the default ASCII text
-	log.SetFormatter(&log.JSONFormatter{})
+	//log.SetFormatter(&log.JSONFormatter{})
 
 	// Output to stdout instead of the default stderr
 	log.SetOutput(os.Stdout)
@@ -156,57 +175,39 @@ func init() {
 	log.SetLevel(log.InfoLevel)
 }
 
-func ValidateVersion(version string) bool {
-	if version == "latest" {
-		return true
-	}
-	version_number_pattern := `[01]\.\d+?(\.\d)?`
-	matched, regexErr := regexp.Match(version_number_pattern, []byte(version))
-	if regexErr != nil {
-		log.Fatal(regexErr)
-	}
-	return matched
-}
-
 func main() {
-	platform := runtime.GOOS + "_" + runtime.GOARCH
-	var version_number string
-
-	cliArgs := os.Args
-	if len(cliArgs) > 1 {
-		if !ValidateVersion(cliArgs[1]) {
-			log.Fatal("Not a valid version")
-		}
-		version_number = cliArgs[1]
-	} else {
-		versions := ListRemoteVersions()
-		version_number = GetVersion(versions)
+	if len(os.Args) < 2 {
+		log.Fatal("Help not implemented yet.")
 	}
+	dirPath := mkdirLocalCache(tfgetHome)
 
-	filePath := "terraform_" + version_number
-	dirPath := mkdirLocalCache("$HOME/.tfget")
-	fullPath := dirPath + "/" + filePath
-	fullPathZip := fullPath + ".zip"
-
-	if _, err := os.Stat(fullPathZip); os.IsNotExist(err) {
+	switch option := os.Args[1]; option {
+	case "list":
+		log.Fatal("Implementing...")
+	case "list-remote":
 		log.WithFields(log.Fields{
-			"version_number": version_number,
-		}).Info("Downloading Terraform version")
-		fileUrl := releasesUrl + version_number + "/terraform_" + version_number + "_" + platform + ".zip"
-
-		downloadErr := DownloadFile(fullPathZip, fileUrl)
-		if downloadErr != nil {
-			log.Fatal(downloadErr)
+			"versions": ListRemoteVersions(),
+		}).Info("Listing all remote versions")
+	case "download":
+		version_number := DetermineVersion(os.Args[2], ListRemoteVersions())
+		filePath := "terraform_" + version_number
+		fullPath := dirPath + "/" + filePath
+		fullPathZip := fullPath + ".zip"
+		if _, err := os.Stat(fullPathZip); os.IsNotExist(err) {
+			downloadErr := DownloadTerraform(fullPathZip, version_number)
+			if downloadErr != nil {
+				log.Fatal(downloadErr)
+			}
+		} else {
+			log.WithFields(log.Fields{
+				"version_number": version_number,
+				"fullPathZip":    fullPathZip,
+			}).Info("Version already exists on disk")
 		}
-		log.WithFields(log.Fields{
-			"fullPathZip":    fullPathZip,
-			"version_number": version_number,
-		}).Info("Downloaded Terraform version on disk")
-	} else {
-		log.WithFields(log.Fields{
-			"version_number": version_number,
-		}).Info("Version already exists on disk")
+		//UnarchiveZipFile(fullPath)
+	case "use":
+		log.Fatal("Not implemented yet.")
+	default:
+		log.Fatal("Help not implemented yet.")
 	}
-
-	//UnarchiveZipFile(fullPath)
 }
