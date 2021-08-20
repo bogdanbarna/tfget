@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bufio"
 	"context"
 	"io"
@@ -18,48 +19,94 @@ import (
 const releasesUrl = "https://releases.hashicorp.com/terraform/"
 const tfgetHome = "$HOME/.tfget/versions"
 
-//func UnarchiveZipFile(filepath string) {
-//	log.Println("Unzipping", filepath)
-//}
-
-func DownloadTerraform(filepath string, version_number string) error {
-	platform := runtime.GOOS + "_" + runtime.GOARCH
-	terraformUrl := releasesUrl + version_number + "/terraform_" + version_number + "_" + platform + ".zip"
+func UnzipTerraformArchive(fullPath string) {
+	fullPathZip := fullPath + ".zip"
 
 	log.WithFields(log.Fields{
-		"filepath": filepath,
-	}).Info("Downloading Terraform version")
-
-	// Handle HTTP request
-	client := &http.Client{}
-	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", terraformUrl, nil)
-	if err != nil {
-		return err
+		"fullPathZip": fullPathZip,
+	}).Info("Unzipping")
+	zipReader, _ := zip.OpenReader(fullPathZip)
+	for _, file := range zipReader.Reader.File {
+		zippedFile, err := file.Open()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer zippedFile.Close()
+		unzippedFile, err := os.OpenFile(
+			fullPath,
+			os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
+			file.Mode(),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer unzippedFile.Close()
+		_, err = io.Copy(unzippedFile, zippedFile)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
-
-	// Get the data
-	resp, err := client.Do(req)
+	err := os.Remove(fullPathZip)
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
-	defer resp.Body.Close()
+}
 
-	// Create local file
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
+func DownloadTerraform(dirPath string, version_number string) error {
+	filePath := "terraform_" + version_number
+	fullPath := dirPath + "/" + filePath
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		fullPathZip := fullPath + ".zip"
+		platform := runtime.GOOS + "_" + runtime.GOARCH
+		terraformUrl := releasesUrl + version_number + "/terraform_" + version_number + "_" + platform + ".zip"
+
+		log.WithFields(log.Fields{
+			"terraformUrl": terraformUrl,
+		}).Info("Downloading Terraform version")
+
+		// Handle HTTP request
+		client := &http.Client{}
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, "GET", terraformUrl, nil)
+		if err != nil {
+			return err
+		}
+
+		// Get the data
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		// Create local file
+		out, err := os.Create(fullPathZip)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		// Write local file body
+		_, err = io.Copy(out, resp.Body)
+		if err != nil {
+			return err
+		}
+
+		// Unzip and remove archive
+		UnzipTerraformArchive(fullPath)
+
+		log.WithFields(log.Fields{
+			"filepath": fullPath,
+		}).Info("Terraform version now on disk")
+	} else {
+		log.WithFields(log.Fields{
+			"version_number": version_number,
+			"fullPath":       fullPath,
+		}).Info("Version already exists on disk")
 	}
-	defer out.Close()
-
-	// Write local file body
-	_, err = io.Copy(out, resp.Body)
-	log.WithFields(log.Fields{
-		"filepath": filepath,
-	}).Info("Downloaded Terraform version on disk")
-	return err
+	return nil
 }
 
 func ListRemoteVersions() []string {
@@ -207,6 +254,7 @@ func main() {
 
 	switch option := os.Args[1]; option {
 	case "list", "list-local":
+		log.Info("Listing all local versions")
 		ListLocal(dirPath)
 	case "list-remote":
 		log.Info("Listing all remote versions")
@@ -216,21 +264,11 @@ func main() {
 		}
 	case "download":
 		version_number := DetermineVersion(os.Args[2], ListRemoteVersions())
-		filePath := "terraform_" + version_number
-		fullPath := dirPath + "/" + filePath
-		fullPathZip := fullPath + ".zip"
-		if _, err := os.Stat(fullPathZip); os.IsNotExist(err) {
-			downloadErr := DownloadTerraform(fullPathZip, version_number)
-			if downloadErr != nil {
-				log.Fatal(downloadErr)
-			}
-		} else {
-			log.WithFields(log.Fields{
-				"version_number": version_number,
-				"fullPathZip":    fullPathZip,
-			}).Info("Version already exists on disk")
+		log.Infof("Downloading Terraform version %v", version_number)
+		downloadErr := DownloadTerraform(dirPath, version_number)
+		if downloadErr != nil {
+			log.Fatal(downloadErr)
 		}
-		//UnarchiveZipFile(fullPath)
 	case "use":
 		log.Fatal("Not implemented yet.")
 	default:
