@@ -20,6 +20,10 @@ Inspired by rbenv, pyenv, tfenv, etc.
 
 ### Run
 
-## TODOs
+## Development
+
+- Docs
+- Roadmap
+- Contributing
 
 ## FAQs
