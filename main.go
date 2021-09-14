@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -18,6 +19,64 @@ import (
 
 const releasesUrl = "https://releases.hashicorp.com/terraform/"
 const tfgetHome = "$HOME/.tfget/versions"
+
+func SwitchVersion(terraformVersion string) {
+	/*
+		Check if there's a globally-installed terraform, exit if so
+		else symlink version to ${tfgetHome}/versions/terraform
+	*/
+	systemTerraformPath := "/usr/local/bin/terraform"
+	if _, err := os.Stat(systemTerraformPath); os.IsNotExist(err) {
+		// if version not found, download it
+
+		// TODO DRY this
+		// Replace $HOME with actual user home
+		tfgetHomeFull := tfgetHome
+		if strings.Contains(tfgetHome, "$HOME") {
+			dirname, homeErr := os.UserHomeDir()
+			if homeErr != nil {
+				log.Fatal(homeErr)
+			}
+			tfgetHomeFull = strings.Replace(tfgetHome, "$HOME", dirname, -1)
+		}
+		//
+
+		// Check if version is present locally
+		// download if not
+		if _, err := os.Stat(systemTerraformPath); os.IsNotExist(err) {
+			log.WithFields(log.Fields{
+				"terraformVersion": terraformVersion,
+			}).
+				Info("Version not found locally. Downloading it now")
+			downloadErr := DownloadTerraform(tfgetHomeFull, terraformVersion)
+			if downloadErr != nil {
+				log.Fatal(downloadErr)
+			}
+		}
+		targetVersionPath := tfgetHomeFull + "/terraform_" + terraformVersion
+
+		symlinkPath := filepath.Join(tfgetHomeFull, "terraform")
+		// First remove existing symlink
+		if _, err := os.Lstat(symlinkPath); err == nil {
+			os.Remove(symlinkPath)
+		}
+		// Create new symlink
+		os.Symlink(targetVersionPath, symlinkPath)
+
+		log.Info("To use this version, make sure you've added tfgetHome to PATH")
+		log.WithFields(log.Fields{
+			"TFGET_HOME": tfgetHome,
+			"PATH":       os.Getenv("PATH"),
+		}).Info("Example: export PATH=\"$HOME/$TFGET_HOME:$PATH\"")
+
+		log.WithFields(log.Fields{
+			"terraformVersion": terraformVersion,
+			"symlinkPath":      symlinkPath,
+		}).Info("Switched to specified version")
+	} else {
+		log.Fatal("Detected system-wide Terraform installation. Exiting")
+	}
+}
 
 func UnzipTerraformArchive(fullPath string) {
 	fullPathZip := fullPath + ".zip"
@@ -41,6 +100,7 @@ func UnzipTerraformArchive(fullPath string) {
 			log.Fatal(err)
 		}
 		defer unzippedFile.Close()
+		// TODO https://stackoverflow.com/questions/67327323/g110-potential-dos-vulnerability-via-decompression-bomb-gosec
 		_, err = io.Copy(unzippedFile, zippedFile)
 		if err != nil {
 			log.Fatal(err)
@@ -269,8 +329,9 @@ func main() {
 		if downloadErr != nil {
 			log.Fatal(downloadErr)
 		}
-	case "use":
-		log.Fatal("Not implemented yet.")
+	case "switch", "use":
+		terraformVersion := DetermineVersion(os.Args[2], ListRemoteVersions())
+		SwitchVersion(terraformVersion)
 	default:
 		log.Fatal("Help not implemented yet.")
 	}
