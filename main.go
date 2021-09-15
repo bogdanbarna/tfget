@@ -20,27 +20,18 @@ import (
 const releasesUrl = "https://releases.hashicorp.com/terraform/"
 const tfgetHome = "$HOME/.tfget/versions"
 
-func SwitchVersion(terraformVersion string) {
+func WhichVersion(dirPath string) {
+	currentTerraformVersion, _ := os.Readlink(filepath.Join(dirPath, "terraform"))
+	log.Info(currentTerraformVersion)
+}
+
+func SwitchVersion(dirPath, terraformVersion string) {
 	/*
 		Check if there's a globally-installed terraform, exit if so
 		else symlink version to ${tfgetHome}/versions/terraform
 	*/
 	systemTerraformPath := "/usr/local/bin/terraform"
 	if _, err := os.Stat(systemTerraformPath); os.IsNotExist(err) {
-		// if version not found, download it
-
-		// TODO DRY this
-		// Replace $HOME with actual user home
-		tfgetHomeFull := tfgetHome
-		if strings.Contains(tfgetHome, "$HOME") {
-			dirname, homeErr := os.UserHomeDir()
-			if homeErr != nil {
-				log.Fatal(homeErr)
-			}
-			tfgetHomeFull = strings.Replace(tfgetHome, "$HOME", dirname, -1)
-		}
-		//
-
 		// Check if version is present locally
 		// download if not
 		if _, err := os.Stat(systemTerraformPath); os.IsNotExist(err) {
@@ -48,14 +39,14 @@ func SwitchVersion(terraformVersion string) {
 				"terraformVersion": terraformVersion,
 			}).
 				Info("Version not found locally. Downloading it now")
-			downloadErr := DownloadTerraform(tfgetHomeFull, terraformVersion)
+			downloadErr := DownloadTerraform(dirPath, terraformVersion)
 			if downloadErr != nil {
 				log.Fatal(downloadErr)
 			}
 		}
-		targetVersionPath := tfgetHomeFull + "/terraform_" + terraformVersion
+		targetVersionPath := dirPath + "/terraform_" + terraformVersion
 
-		symlinkPath := filepath.Join(tfgetHomeFull, "terraform")
+		symlinkPath := filepath.Join(dirPath, "terraform")
 		// First remove existing symlink
 		if _, err := os.Lstat(symlinkPath); err == nil {
 			os.Remove(symlinkPath)
@@ -112,7 +103,7 @@ func UnzipTerraformArchive(fullPath string) {
 	}
 }
 
-func DownloadTerraform(dirPath string, version_number string) error {
+func DownloadTerraform(dirPath, version_number string) error {
 	filePath := "terraform_" + version_number
 	fullPath := dirPath + "/" + filePath
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
@@ -331,7 +322,9 @@ func main() {
 		}
 	case "switch", "use":
 		terraformVersion := DetermineVersion(os.Args[2], ListRemoteVersions())
-		SwitchVersion(terraformVersion)
+		SwitchVersion(dirPath, terraformVersion)
+	case "which", "which-version":
+		WhichVersion(dirPath)
 	default:
 		log.Fatal("Help not implemented yet.")
 	}
