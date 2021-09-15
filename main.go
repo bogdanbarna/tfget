@@ -111,13 +111,13 @@ func UnzipTerraformArchive(fullPath string) {
 	}
 }
 
-func DownloadTerraform(dirPath, version_number string) error {
-	filePath := "terraform_" + version_number
+func DownloadTerraform(dirPath, terraformVersion string) error {
+	filePath := "terraform_" + terraformVersion
 	fullPath := dirPath + "/" + filePath
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		fullPathZip := fullPath + ".zip"
 		platform := runtime.GOOS + "_" + runtime.GOARCH
-		terraformUrl := releasesUrl + version_number + "/terraform_" + version_number + "_" + platform + ".zip"
+		terraformUrl := releasesUrl + terraformVersion + "/terraform_" + terraformVersion + "_" + platform + ".zip"
 
 		log.WithFields(log.Fields{
 			"terraformUrl": terraformUrl,
@@ -161,8 +161,8 @@ func DownloadTerraform(dirPath, version_number string) error {
 		}).Info("Terraform version now on disk")
 	} else {
 		log.WithFields(log.Fields{
-			"version_number": version_number,
-			"fullPath":       fullPath,
+			"terraformVersion": terraformVersion,
+			"fullPath":         fullPath,
 		}).Info("Version already exists on disk")
 	}
 	return nil
@@ -208,8 +208,8 @@ func ListRemoteVersions() []string {
 				t = z.Token()
 				if strings.Contains(t.Data, "terraform") {
 					// terraform_$version_number
-					version_number := strings.Split(t.Data, "_")[1]
-					versions = append(versions, version_number)
+					terraformVersion := strings.Split(t.Data, "_")[1]
+					versions = append(versions, terraformVersion)
 				}
 			}
 		}
@@ -241,25 +241,25 @@ func ListLocal(dirPath string) {
 }
 
 func DetermineVersion(cliArg string, versions []string) string {
-	var version_number string
+	var terraformVersion string
 
 	if cliArg != "" {
 		if cliArg == "latest" {
-			version_number = versions[0]
+			terraformVersion = versions[0]
 		} else {
-			found_it := false
-			for _, a_version := range versions {
-				if strings.Contains(a_version, cliArg) {
-					version_number = a_version
-					found_it = true
+			foundit := false
+			for _, aVersion := range versions {
+				if strings.Contains(aVersion, cliArg) {
+					terraformVersion = aVersion
+					foundit = true
 					break
 				}
 			}
-			if found_it {
-				version_number = cliArg
+			if foundit {
+				terraformVersion = cliArg
 			} else {
 				log.WithFields(log.Fields{
-					"version_number": version_number,
+					"terraformVersion": terraformVersion,
 				}).Fatal("Version not found ")
 			}
 		}
@@ -267,7 +267,7 @@ func DetermineVersion(cliArg string, versions []string) string {
 		log.Fatal("No CLI arguments found")
 	}
 
-	return version_number
+	return terraformVersion
 }
 
 // Local cache
@@ -322,9 +322,9 @@ func main() {
 			log.Info(v)
 		}
 	case "download":
-		version_number := DetermineVersion(os.Args[2], ListRemoteVersions())
-		log.Infof("Downloading Terraform version %v", version_number)
-		downloadErr := DownloadTerraform(dirPath, version_number)
+		terraformVersion := DetermineVersion(os.Args[2], ListRemoteVersions())
+		log.Infof("Downloading Terraform version %v", terraformVersion)
+		downloadErr := DownloadTerraform(dirPath, terraformVersion)
 		if downloadErr != nil {
 			log.Fatal(downloadErr)
 		}
