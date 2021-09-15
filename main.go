@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -51,7 +52,10 @@ func SwitchVersion(dirPath, terraformVersion string) {
 			os.Remove(symlinkPath)
 		}
 		// Create new symlink
-		os.Symlink(targetVersionPath, symlinkPath)
+		err = os.Symlink(targetVersionPath, symlinkPath)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		log.Info("To use this version, make sure you've added tfgetHome to PATH")
 		log.WithFields(log.Fields{
@@ -81,6 +85,7 @@ func UnzipTerraformArchive(fullPath string) {
 			log.Fatal(err)
 		}
 		defer zippedFile.Close()
+
 		unzippedFile, err := os.OpenFile(
 			fullPath,
 			os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
@@ -90,10 +95,14 @@ func UnzipTerraformArchive(fullPath string) {
 			log.Fatal(err)
 		}
 		defer unzippedFile.Close()
-		// TODO https://stackoverflow.com/questions/67327323/g110-potential-dos-vulnerability-via-decompression-bomb-gosec
-		_, err = io.Copy(unzippedFile, zippedFile)
-		if err != nil {
-			log.Fatal(err)
+
+		for {
+			_, err = io.CopyN(unzippedFile, zippedFile, 1024)
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+			}
 		}
 	}
 	err := os.Remove(fullPathZip)
