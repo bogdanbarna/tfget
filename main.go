@@ -32,9 +32,9 @@ func SwitchVersion(dirPath, terraformVersion string) {
 	*/
 	systemTerraformPath := "/usr/local/bin/terraform"
 	if _, err := os.Stat(systemTerraformPath); os.IsNotExist(err) {
-		// Check if version is present locally
-		// download if not
-		if _, err := os.Stat(systemTerraformPath); os.IsNotExist(err) {
+		// Check if version is present locally; download if not
+		targetVersionPath := dirPath + "/terraform_" + terraformVersion
+		if _, err := os.Stat(targetVersionPath); os.IsNotExist(err) {
 			log.WithFields(log.Fields{
 				"terraformVersion": terraformVersion,
 			}).
@@ -44,7 +44,6 @@ func SwitchVersion(dirPath, terraformVersion string) {
 				log.Fatal(downloadErr)
 			}
 		}
-		targetVersionPath := dirPath + "/terraform_" + terraformVersion
 
 		symlinkPath := filepath.Join(dirPath, "terraform")
 		// First remove existing symlink
