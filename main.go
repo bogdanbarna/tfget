@@ -21,16 +21,15 @@ import (
 const releasesUrl = "https://releases.hashicorp.com/terraform/"
 const tfgetHome = "$HOME/.tfget/versions"
 
+// Print current version
 func WhichVersion(dirPath string) {
 	currentTerraformVersion, _ := os.Readlink(filepath.Join(dirPath, "terraform"))
 	log.Info(currentTerraformVersion)
 }
 
+// Check if there's a globally-installed terraform, exit if so
+// else symlink version to ${tfgetHome}/versions/terraform
 func SwitchVersion(dirPath, terraformVersion string) {
-	/*
-		Check if there's a globally-installed terraform, exit if so
-		else symlink version to ${tfgetHome}/versions/terraform
-	*/
 	systemTerraformPath := "/usr/local/bin/terraform"
 	if _, err := os.Stat(systemTerraformPath); os.IsNotExist(err) {
 		// Check if version is present locally; download if not
@@ -72,6 +71,7 @@ func SwitchVersion(dirPath, terraformVersion string) {
 	}
 }
 
+// Runs after Download()
 func UnzipTerraformArchive(fullPath string) {
 	fullPathZip := fullPath + ".zip"
 
@@ -111,6 +111,7 @@ func UnzipTerraformArchive(fullPath string) {
 	}
 }
 
+// Download Terraform archive, then call UnzipTerraformArchive()
 func DownloadTerraform(dirPath, terraformVersion string) error {
 	filePath := "terraform_" + terraformVersion
 	fullPath := dirPath + "/" + filePath
@@ -168,6 +169,7 @@ func DownloadTerraform(dirPath, terraformVersion string) error {
 	return nil
 }
 
+// Crawl the releases page and get a list of released versions
 func ListRemoteVersions() []string {
 	// Handle HTTP request
 	client := &http.Client{}
@@ -221,16 +223,14 @@ func ListLocal(dirPath string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	/*
-		Readdir(n int) reads the contents of the directory associated with file and returns a slice of up to n FileInfo values,
-		as would be returned by Lstat, in directory order.
-		Subsequent calls on the same file will yield further FileInfos.
-		If n > 0, Readdir() returns at most n FileInfo structures.
-		In this case, if Readdir() returns an empty slice, it will return a non-nil error explaining why.
-		At the end of a directory, the error is io.EOF.
-		If n <= 0, Readdir() returns all the FileInfo from the directory in a single slice
-		(Explication shamelessly copied from https://golang.cafe/blog/how-to-list-files-in-a-directory-in-go.html)
-	*/
+	// Readdir(n int) reads the contents of the directory associated with file and returns a slice of up to n FileInfo values,
+	// as would be returned by Lstat, in directory order.
+	// Subsequent calls on the same file will yield further FileInfos.
+	// If n > 0, Readdir() returns at most n FileInfo structures.
+	// In this case, if Readdir() returns an empty slice, it will return a non-nil error explaining why.
+	// At the end of a directory, the error is io.EOF.
+	// If n <= 0, Readdir() returns all the FileInfo from the directory in a single slice
+	// (Explication shamelessly copied from https://golang.cafe/blog/how-to-list-files-in-a-directory-in-go.html)
 	files, err := fp.Readdir(0)
 	if err != nil {
 		log.Fatal(err)
@@ -240,6 +240,7 @@ func ListLocal(dirPath string) {
 	}
 }
 
+// Parse CLI argument and check against a list of versions
 func DetermineVersion(cliArg string, versions []string) string {
 	var terraformVersion string
 
@@ -270,7 +271,7 @@ func DetermineVersion(cliArg string, versions []string) string {
 	return terraformVersion
 }
 
-// Local cache
+// Ensure local cache is present (see tfgetHome constant)
 func mkdirLocalCache(dirPath string) string {
 	// Replace $HOME with actual user home
 	if strings.Contains(dirPath, "$HOME") {
