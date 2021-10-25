@@ -175,11 +175,11 @@ func ListRemoteVersions() []string {
 	client := &http.Client{}
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", releasesUrl, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer cancel()
 
 	// Get the data
 	resp, err := client.Do(req)
